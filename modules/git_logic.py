@@ -14,12 +14,13 @@ def git_update_repo():
 
 
 def git_push():
+    git.add("-f", "modules/git_logic.py")
     git.add("-f", "logs/linux.log")
     git.add("-f", "logs/windows.log")
     git.add("-f", "logs/macosx.log")
     git.commit("-m", "Automated Push via Script")
-    git.push("origin")
+    git.push()
 
 
-
+git_update_repo()
 git_push()
