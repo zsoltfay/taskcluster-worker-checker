@@ -7,6 +7,7 @@ try:
     import urllib.request, json
     import logging
     from configs.known_machines import *
+    from gui.gui_logic import *
 except ImportError:
     from setup import setup
 
@@ -21,9 +22,32 @@ MACOSX = "gecko-t-osx-1010"
 LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
 logging.basicConfig(filename="logs/runtime.log",
                     level=logging.DEBUG,
-                    format=LOG_FORMAT)
+                    format=LOG_FORMAT
+                    )
 
+consoleHandler = logging.StreamHandler()
 run_logger = logging.getLogger()
+run_logger.addHandler(consoleHandler)
+
+run_formatter = logging.Formatter('%(levelname)s: %(asctime)s - %(message)s')
+machine_formatter = logging.Formatter('%(asctime)s - %(message)s', '%Y.%m.%d %H:%M')
+
+
+def machine_logger(name, log_file, level=logging.INFO):
+    """Function to setup as many loggers as we need"""
+    handler = logging.FileHandler(log_file)
+    handler.setFormatter(machine_formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+
+    return logger
+
+
+lin_logger = machine_logger('lin_logger', 'logs/linux.log')
+win_logger = machine_logger('win_logger', 'logs/windows.log')
+osx_logger = machine_logger('osx_logger', 'logs/macosx.log')
 
 
 def get_all_keys(*args):
@@ -61,7 +85,7 @@ def parse_taskcluster_json(workertype):
             data = json.loads(api.read().decode())
 
         except:
-            run_logger.warning("Coundn't precess the JSON file in 10 seconds or less!")
+            run_logger.info("Coundn't precess the JSON file in 10 seconds or less!")
             exit(0)
 
         try:
@@ -367,6 +391,19 @@ def main():
     if (workertype == WINDOWS) or (workertype == "win"):
         print('W1064 WORKERS FROM CHASSIS 8 (316-345) HAVE BEEN ADDED TO PRODUCTION. '
               'RE-IMAGE THESE WITH THE 2ND OPTION: GENERIC WORKER 10.10')
+
+    # Add Logs to files:
+    if (workertype == LINUX) or (workertype == "linux"):
+        lin_logger.info(len(missing_machines))
+
+    if (workertype == WINDOWS) or (workertype == "win"):
+        win_logger.info(len(missing_machines))
+
+    if (workertype == MACOSX) or (workertype == "osx"):
+        osx_logger.info(len(missing_machines))
+
+    if evolution:
+        generate_graph()
 
 
 if __name__ == '__main__':
