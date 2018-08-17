@@ -8,6 +8,7 @@ try:
     import logging
     from configs.known_machines import *
     from gui.gui_logic import *
+    from modules.git_logic import *
 except ImportError:
     from setup import setup
 
@@ -407,4 +408,6 @@ def main():
 
 
 if __name__ == '__main__':
+    git_update_repo()
     main()
+    git_push()
