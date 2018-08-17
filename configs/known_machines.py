@@ -173,3 +173,15 @@ machines_to_ignore = {
         },
     },
 }
+
+
+def build_host_info(hostnames, **kwargs):
+    all_hosts = {}
+    for hostname in hostnames:
+        all_hosts.update({hostname: dict(kwargs)})
+    return all_hosts
+
+
+# Insert Windows 10 to 60 into the dictionary.
+machines_to_ignore['windows']['loaner'].update(
+    build_host_info(["T-W1064-MS-0{}".format(i) for i in range(10, 61)], bug="Dev-Environment", owner="No Owner"))

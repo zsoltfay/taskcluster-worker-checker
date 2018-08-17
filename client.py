@@ -2,199 +2,15 @@
 This script will check for missing moonshots in TaskCluster.
 github repo: https://github.com/Akhliskun/taskcluster-worker-checker
 """
+try:
+    from argparse import ArgumentParser
+    import urllib.request, json
+    import logging
+    from configs.known_machines import *
+except ImportError:
+    from setup import setup
+    setup()
 
-from argparse import ArgumentParser
-import urllib.request, json
-
-# Define machines that SHOULDN'T appear.
-# Example: Machine is dev-env, loaner, or has known problems etc.
-machines_to_ignore = {
-    "linux": {
-        "loaner": {
-            "t-linux64-ms-240": {
-                "bug": "Staging Pool - No Bug",
-                "owner": ":dragrom"
-            },
-
-            "t-linux64-ms-280": {
-                "bug": "Staging Pool - https://bugzilla.mozilla.org/show_bug.cgi?id=1464070",
-                "owner": ":dragrom"
-            },
-
-            "t-linux64-ms-394": {
-                "bug": "Staging Pool - No Bug",
-                "owner": ":dragrom"
-            },
-
-            "t-linux64-ms-395": {
-                "bug": "Staging Pool - No Bug",
-                "owner": ":dragrom"
-            },
-
-            "t-linux64-ms-580": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1474573",
-                "owner": ":dev-env"
-            },
-        },
-        "pxe_issues": {
-            "No Issue": {
-                "bug": "No BUG",
-                "date": "No Date",
-                "update": "No Update"
-            },
-        },
-        "hdd_issues": {
-            "No Issue": {
-                "bug": "No BUG",
-                "date": "No Date",
-                "update": "No Update"
-            },
-        },
-        "other_issues": {
-            "No Issue": {
-                "bug": "No BUG",
-                "date": "No Date",
-                "update": "No Update"
-            },
-        },
-    },
-    "windows": {
-        "loaner": {
-        },
-        "pxe_issues": {
-            "T-W1064-MS-281": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1465753",
-                "date": "13.07.2018",
-                "update": "https://bugzilla.mozilla.org/show_bug.cgi?id=1465753#c6"
-            },
-            "T-W1064-MS-338": {  # TODO: Make bug!
-                "bug": "",
-                "date": "15.07.2018",
-                "update": "MDC2 machine shows up as MDC1 and does prod jobs"
-            },
-        },
-        "hdd_issues": {
-            "T-W1064-MS-065": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1477426",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "T-W1064-MS-071": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1475905",
-                "date": "15.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "T-W1064-MS-261": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1475906",
-                "date": "15.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "T-W1064-MS-291": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1475908",
-                "date": "15.07.2018",
-                "update": "New bug, no updates yet."
-            },
-        },
-        "other_issues": {
-            "T-W1064-MS-072": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1477644",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "T-W1064-MS-130": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1463754",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "T-W1064-MS-177": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1477654",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "T-W1064-MS-178": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1477656",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-        },
-    },
-    "osx": {
-        "loaner": {
-            "t-yosemite-r7-100": {
-                "bug": "Staging Pool - No Bug",
-                "owner": ":dragrom"
-            },
-
-            "t-yosemite-r7-101": {
-                "bug": "Staging Pool - No Bug",
-                "owner": ":dragrom"
-            },
-
-            "t-yosemite-r7-380": {
-                "bug": "Staging Pool - No Bug",
-                "owner": ":dragrom"
-            },
-
-            "t-yosemite-r7-394": {
-                "bug": "Staging Pool - No Bug",
-                "owner": ":dragrom"
-            },
-        },
-        "ssh_stdio": {
-            "t-yosemite-r7-055": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1476496",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "t-yosemite-r7-061": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1476497",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "t-yosemite-r7-151": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1476498",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "t-yosemite-r7-201": {
-                "bug": "https://bugzilla.mozilla.org/show_bug.cgi?id=1477150",
-                "date": "23.07.2018",
-                "update": "New bug, no updates yet."
-            },
-        },
-        "ssh_unresponsive": {
-            "t-yosemite-r7-130": {  # TODO: Make bug!
-                "bug": "",
-                "date": "15.07.2018",
-                "update": "New bug, no updates yet."
-            },
-            "t-yosemite-r7-357": {  # TODO: Make bug!
-                "bug": "",
-                "date": "15.07.2018",
-                "update": "New bug, no updates yet."
-            },
-        },
-        "other_issues": {
-            "t-yosemite-r7-442": {
-                "bug": "",
-                "date": "15.07.2018",
-                "update": "New bug, no updates yet."
-            },  # TODO: Make bug!
-        },
-    },
-}
-
-
-def build_host_info(hostnames, **kwargs):
-    all_hosts = {}
-    for hostname in hostnames:
-        all_hosts.update({hostname: dict(kwargs)})
-    return all_hosts
-
-
-# Insert Windows 10 to 60 into the dictionary.
-machines_to_ignore['windows']['loaner'].update(
-    build_host_info(["T-W1064-MS-0{}".format(i) for i in range(10, 61)], bug="Dev-Environment", owner="No Owner"))
 
 workersList = []
 
@@ -209,47 +25,6 @@ def get_all_keys(*args):
     for d in args:
         all_keys.extend(list(d.keys()))
     return all_keys
-
-
-def parse_taskcluster_json(workertype):
-    '''
-    We need this incase Auth fails.
-    :param workertype: gecko-t-linux-talos, gecko-t-win10-64-hw, gecko-t-osx-1010.
-    :return: A JSON file containing all workers for a workertype selected at runtime.
-    '''
-
-    # Setup API URLs
-    if (workertype == LINUX) or (workertype == "linux"):
-        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-linux-talos/workers"
-
-    elif (workertype == WINDOWS) or (workertype == "win"):
-        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-win10-64-hw/workers"
-
-    elif (workertype == MACOSX) or (workertype == "osx"):
-        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-osx-1010/workers"
-
-    else:
-        print("ERROR: Unknown worker-type!")
-        print("Please run the script with the [client.py -h] to see the help docs!")
-        exit(0)
-
-    with urllib.request.urlopen(apiUrl) as api:
-        try:
-            data = json.loads(api.read().decode())
-        except:
-            print("ERROR: Couldn't read and/or decode the JSON!")
-
-        if not data["workers"]:
-            # Not sure why but TC kinda fails at responding or I'm doing something wrong
-            # Anyways if you keep at it, it will respond with the JSON data :D
-            print("JSON Response Failed. Retrying...")
-            parse_taskcluster_json(workertype)
-
-        else:
-            for workers in data['workers']:
-                workersList.append(workers['workerId'])
-
-    return workersList
 
 
 def generate_machine_lists(workertype):
@@ -314,6 +89,47 @@ def generate_machine_lists(workertype):
         exit(0)
 
 
+def parse_taskcluster_json(workertype):
+    '''
+    We need this incase Auth fails.
+    :param workertype: gecko-t-linux-talos, gecko-t-win10-64-hw, gecko-t-osx-1010.
+    :return: A JSON file containing all workers for a workertype selected at runtime.
+    '''
+
+    # Setup API URLs
+    if (workertype == LINUX) or (workertype == "linux"):
+        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-linux-talos/workers"
+
+    elif (workertype == WINDOWS) or (workertype == "win"):
+        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-win10-64-hw/workers"
+
+    elif (workertype == MACOSX) or (workertype == "osx"):
+        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-osx-1010/workers"
+
+    else:
+        print("ERROR: Unknown worker-type!")
+        print("Please run the script with the [client.py -h] to see the help docs!")
+        exit(0)
+
+    with urllib.request.urlopen(apiUrl) as api:
+        try:
+            data = json.loads(api.read().decode())
+        except:
+            print("ERROR: Couldn't read and/or decode the JSON!")
+
+        if not data["workers"]:
+            # Not sure why but TC kinda fails at responding or I'm doing something wrong
+            # Anyways if you keep at it, it will respond with the JSON data :D
+            print("JSON Response Failed. Retrying...")
+            parse_taskcluster_json(workertype)
+
+        else:
+            for workers in data['workers']:
+                workersList.append(workers['workerId'])
+
+    return workersList
+
+
 def main():
     # Get/Set Arguments
     parser = ArgumentParser(description="Utility to check missing moonshots form TC.")
@@ -329,6 +145,12 @@ def main():
                         required=False)
 
     parser.add_argument("-v", "--verbose",
+                        dest="verbose_enabler",
+                        help="Example: -v True",
+                        default=False,
+                        required=False)
+
+    parser.add_argument("-e", "--evolution",
                         dest="verbose_enabler",
                         help="Example: -v True",
                         default=False,
