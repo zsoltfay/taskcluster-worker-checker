@@ -6,7 +6,9 @@ This utility will check [TaskCluster](https://github.com/taskcluster) provisione
 ## Instalation:
 1) Make sure you have PrettyTable installed on your system, by running:
 
-    `pip install prettytable` - Works on Linux, Mac, Windows if python is installed.
+    `pip install prettytable matplotlib gitpython` - Works on Linux, Mac, Windows if python is installed.
+    
+    `sudo apt install python3-tk` - UNIX systems only.
 
 2) Clone clone the repository and run client.py
 
