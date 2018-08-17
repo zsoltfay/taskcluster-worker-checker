@@ -188,7 +188,7 @@ def main():
     parser.add_argument("-e", "--evolution",
                         dest="evolution_graph",
                         help="Example: -e True",
-                        default=True,
+                        default=False,
                         required=False)
 
     args = parser.parse_args()
@@ -408,5 +408,6 @@ def main():
 
 
 if __name__ == '__main__':
+    git_update_repo()
     main()
-    # git_push()
+    git_push()
