@@ -1,7 +1,6 @@
 from matplotlib import pyplot as plt
 from matplotlib import style
 import csv
-from client import run_logger
 
 
 style.use("seaborn")
@@ -26,14 +25,14 @@ def generate_graph():
             y.append(int(row[1]))
 
     with open("logs/windows.log", "r") as csvfile:
-        run_logger.info("Plotting WINDOWS machines to the graph.")
+
         plots = csv.reader(csvfile, delimiter="-")
         for row in plots:
             x2.append(str(row[0]))
             y2.append(int(row[1]))
 
     with open("logs/macosx.log", "r") as csvfile:
-        run_logger.info("Plotting MACOSX machines to the graph.")
+
         plots = csv.reader(csvfile, delimiter="-")
         for row in plots:
             x3.append(str(row[0]))

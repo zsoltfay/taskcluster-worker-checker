@@ -171,7 +171,7 @@ def main():
     parser.add_argument("-w", "--worker-type",
                         dest="worker_type",
                         help="Available options: win, linux, osx",
-                        default=LINUX,
+                        default=WINDOWS,
                         required=False)
     parser.add_argument("-u", "--ldap-username",
                         dest="ldap_username",
@@ -408,6 +408,5 @@ def main():
 
 
 if __name__ == '__main__':
-    git_update_repo()
     main()
     git_push()
