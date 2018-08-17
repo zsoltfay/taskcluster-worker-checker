@@ -9,14 +9,21 @@ try:
     from configs.known_machines import *
 except ImportError:
     from setup import setup
+
     setup()
 
-
 workersList = []
-
 LINUX = "gecko-t-linux-talos"
 WINDOWS = "gecko-t-win10-64-hw"
 MACOSX = "gecko-t-osx-1010"
+
+# Configure Logger
+LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
+logging.basicConfig(filename="logs/runtime.log",
+                    level=logging.DEBUG,
+                    format=LOG_FORMAT)
+
+run_logger = logging.getLogger()
 
 
 def get_all_keys(*args):
@@ -25,6 +32,53 @@ def get_all_keys(*args):
     for d in args:
         all_keys.extend(list(d.keys()))
     return all_keys
+
+
+def parse_taskcluster_json(workertype):
+    '''
+    We need this incase Auth fails.
+    :param workertype: gecko-t-linux-talos, gecko-t-win10-64-hw, gecko-t-osx-1010.
+    :return: A JSON file containing all workers for a workertype selected at runtime.
+    '''
+
+    # Setup API URLs
+    if (workertype == LINUX) or (workertype == "linux"):
+        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-linux-talos/workers"
+
+    elif (workertype == WINDOWS) or (workertype == "win"):
+        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-win10-64-hw/workers"
+
+    elif (workertype == MACOSX) or (workertype == "osx"):
+        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-osx-1010/workers"
+
+    else:
+        run_logger.error("Unknown worker-type!")
+        run_logger.info("Please run the script with the [client.py -h] to see the help docs!")
+        exit(0)
+
+    with urllib.request.urlopen(apiUrl, timeout=10) as api:
+        try:
+            data = json.loads(api.read().decode())
+
+        except:
+            run_logger.warning("Coundn't precess the JSON file in 10 seconds or less!")
+            exit(0)
+
+        try:
+            if not data["workers"]:
+                # Not sure why but TC kinda fails at responding or I'm doing something wrong
+                # Anyways if you keep at it, it will respond with the JSON data :D
+                run_logger.info("JSON Response Failed. Retrying...")
+                parse_taskcluster_json(workertype)
+            else:
+                for workers in data['workers']:
+                    workersList.append(workers['workerId'])
+
+        except KeyboardInterrupt:
+            run_logger.info("Application stopped via Keyboard Shortcut.")
+            exit(0)
+
+    return workersList
 
 
 def generate_machine_lists(workertype):
@@ -55,12 +109,9 @@ def generate_machine_lists(workertype):
                      list(range(106, 136)) + list(range(151, 181)) + \
                      list(range(196, 226)) + list(range(241, 271)) + \
                      list(range(281, 299))
-        mdc2_range = list(range(316, 346)) + \
-                     list(range(361, 391)) + list(range(406, 436)) + \
-                     list(range(451, 481)) + list(range(496, 526)) + \
-                     list(range(541, 571)) + list(range(581, 601))
+        mdc2_range = list(range(316, 346))
 
-        range_ms_windows = mdc1_range  # Ignoring MDC2 for now. ToDo: Do we have a BUG for mdc2 Win10?
+        range_ms_windows = mdc1_range + mdc2_range
 
         ms_windows_name = "T-W1064-MS-{}"
         windows_machines = []
@@ -89,53 +140,12 @@ def generate_machine_lists(workertype):
         exit(0)
 
 
-def parse_taskcluster_json(workertype):
-    '''
-    We need this incase Auth fails.
-    :param workertype: gecko-t-linux-talos, gecko-t-win10-64-hw, gecko-t-osx-1010.
-    :return: A JSON file containing all workers for a workertype selected at runtime.
-    '''
-
-    # Setup API URLs
-    if (workertype == LINUX) or (workertype == "linux"):
-        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-linux-talos/workers"
-
-    elif (workertype == WINDOWS) or (workertype == "win"):
-        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-win10-64-hw/workers"
-
-    elif (workertype == MACOSX) or (workertype == "osx"):
-        apiUrl = "https://queue.taskcluster.net/v1/provisioners/releng-hardware/worker-types/gecko-t-osx-1010/workers"
-
-    else:
-        print("ERROR: Unknown worker-type!")
-        print("Please run the script with the [client.py -h] to see the help docs!")
-        exit(0)
-
-    with urllib.request.urlopen(apiUrl) as api:
-        try:
-            data = json.loads(api.read().decode())
-        except:
-            print("ERROR: Couldn't read and/or decode the JSON!")
-
-        if not data["workers"]:
-            # Not sure why but TC kinda fails at responding or I'm doing something wrong
-            # Anyways if you keep at it, it will respond with the JSON data :D
-            print("JSON Response Failed. Retrying...")
-            parse_taskcluster_json(workertype)
-
-        else:
-            for workers in data['workers']:
-                workersList.append(workers['workerId'])
-
-    return workersList
-
-
 def main():
     # Get/Set Arguments
     parser = ArgumentParser(description="Utility to check missing moonshots form TC.")
     parser.add_argument("-w", "--worker-type",
                         dest="worker_type",
-                        help="Available options: gecko-t-linux-talos, linux, gecko-t-win10-64-hw, win, gecko-t-osx-1010, mac",
+                        help="Available options: win, linux, osx",
                         default=LINUX,
                         required=False)
     parser.add_argument("-u", "--ldap-username",
@@ -151,8 +161,8 @@ def main():
                         required=False)
 
     parser.add_argument("-e", "--evolution",
-                        dest="verbose_enabler",
-                        help="Example: -v True",
+                        dest="evolution_graph",
+                        help="Example: -e True",
                         default=False,
                         required=False)
 
@@ -160,12 +170,13 @@ def main():
     workertype = args.worker_type
     ldap = args.ldap_username
     verbose = args.verbose_enabler
+    evolution = args.evolution_graph
 
     parse_taskcluster_json(workertype)
-    
+
     if verbose:
         from prettytable import PrettyTable
-    
+
     # Remove machines from generated list
     if (workertype == LINUX) or (workertype == "linux"):
         loaners = machines_to_ignore["linux"]["loaner"]
@@ -351,6 +362,11 @@ def main():
                 print("ssh {}@{}.test.releng.mdc2.mozilla.com".format(ldap, machine))
             else:
                 print("ssh {}@{}.test.releng.mdc1.mozilla.com".format(ldap, machine))
+
+    # Add Windows 10 Warning!
+    if (workertype == WINDOWS) or (workertype == "win"):
+        print('W1064 WORKERS FROM CHASSIS 8 (316-345) HAVE BEEN ADDED TO PRODUCTION. '
+              'RE-IMAGE THESE WITH THE 2ND OPTION: GENERIC WORKER 10.10')
 
 
 if __name__ == '__main__':

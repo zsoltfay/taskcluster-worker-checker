@@ -20,3 +20,7 @@ def git_push():
     git.add("logs/macosx.log")
     git.commit("-m", "Automated Push via Script")
     git.push(repo.active_branch, "origin")
+
+
+
+
